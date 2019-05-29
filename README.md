@@ -1,5 +1,7 @@
 # Task_Queue
 
+[![CircleCI](https://circleci.com/gh/nozo-moto/taskqueue.svg?style=svg)](https://circleci.com/gh/nozo-moto/taskqueue)
+
 This is task queue worker
 
 # Usage
