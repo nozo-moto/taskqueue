@@ -16,21 +16,35 @@ func main() {
 
 	for {
 		index := i + 1
-		taskQueue.Add(
+		err := taskQueue.Add(
 			func() error {
 				fmt.Printf("hoge %d\n", index)
 				return nil
 			},
-			5,
+			3,
 		)
-		taskQueue.Add(
+		if err != nil {
+			fmt.Println("error", err)
+			break
+		}
+		err = taskQueue.Add(
 			func() error {
 				fmt.Printf("error %d\n", index)
 				return fmt.Errorf("hoge %d", index)
 			},
 			2,
 		)
+		if err != nil {
+			fmt.Println("error", err)
+			break
+		}
 		time.Sleep(100 * time.Millisecond)
 		i++
+
+		if i > 20 {
+			taskQueue.Stop()
+			fmt.Println("task Stopped")
+			break
+		}
 	}
 }
