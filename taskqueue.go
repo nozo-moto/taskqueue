@@ -7,8 +7,9 @@ import (
 )
 
 type task struct {
-	f          func() error
+	f          func(...interface{}) error
 	retryTimes int
+	args       []interface{}
 }
 
 // TaskQueue is taskqueue struct
@@ -27,7 +28,7 @@ func New(interval time.Duration) *TaskQueue {
 }
 
 // Add is add job to task queue
-func (t *TaskQueue) Add(f func() error, retryTimes int) error {
+func (t *TaskQueue) Add(f func(...interface{}) error, retryTimes int, args ...interface{}) error {
 	if t.breakFlag {
 		return errors.New("taskQueue.Stop is called")
 	}
@@ -35,16 +36,18 @@ func (t *TaskQueue) Add(f func() error, retryTimes int) error {
 	t.tasks = append(t.tasks, task{
 		f:          f,
 		retryTimes: retryTimes,
+		args:       args,
 	})
 	t.Unlock()
 	return nil
 }
 
-func (t *TaskQueue) addNotCheckBreakFlag(f func() error, retryTimes int) {
+func (t *TaskQueue) addNotCheckBreakFlag(f func(...interface{}) error, retryTimes int, args ...interface{}) {
 	t.Lock()
 	t.tasks = append(t.tasks, task{
 		f:          f,
 		retryTimes: retryTimes,
+		args:       args,
 	})
 	t.Unlock()
 }
@@ -55,7 +58,7 @@ L:
 	for {
 		if len(t.tasks) > 0 {
 			tt := t.pop()
-			if err := tt.f(); err != nil {
+			if err := tt.f(tt.args); err != nil {
 				t.retry(tt)
 			}
 		}
@@ -68,7 +71,7 @@ L:
 
 func (t *TaskQueue) retry(tt task) {
 	if tt.retryTimes > 1 {
-		t.addNotCheckBreakFlag(tt.f, tt.retryTimes-1)
+		t.addNotCheckBreakFlag(tt.f, tt.retryTimes-1, tt.args...)
 	}
 }
 
