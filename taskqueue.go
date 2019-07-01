@@ -85,5 +85,6 @@ func (t *TaskQueue) pop() task {
 
 // Stop stop taskqueue
 func (t *TaskQueue) Stop() {
+	t.breakFlag = true
 	<-t.ch
 }
