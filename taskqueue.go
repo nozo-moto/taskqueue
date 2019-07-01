@@ -18,12 +18,14 @@ type TaskQueue struct {
 	sync.RWMutex
 	tasks     []task
 	breakFlag bool
+	ch        chan int
 }
 
 // New Create new struct
 func New(interval time.Duration) *TaskQueue {
 	return &TaskQueue{
 		interval: interval,
+		ch:       make(chan int),
 	}
 }
 
@@ -63,6 +65,7 @@ L:
 			}
 		}
 		if len(t.tasks) <= 0 && t.breakFlag {
+			t.ch <- 1
 			break L
 		}
 		time.Sleep(t.interval)
@@ -86,9 +89,5 @@ func (t *TaskQueue) pop() task {
 // Stop stop taskqueue
 func (t *TaskQueue) Stop() {
 	t.breakFlag = true
-	for {
-		if len(t.tasks) <= 0 {
-			break
-		}
-	}
+	<-t.ch
 }
