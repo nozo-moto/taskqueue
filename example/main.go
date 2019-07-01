@@ -8,44 +8,77 @@ import (
 )
 
 func main() {
+	var err error
 	taskQueue := taskqueue.New(100 * time.Millisecond)
 	go taskQueue.Run()
+	defer taskQueue.Stop()
+
 	fmt.Println("task run ")
 
-	var i int
-	i = 0
+	go func() {
+		for {
+			err := <-taskQueue.Error
+			fmt.Println("error cause  ", err.Err, err.Task.RetryTimes)
+		}
+	}()
 
-	for {
-		index := i + 1
-		err := taskQueue.Add(
-			func() error {
-				fmt.Printf("hoge %d\n", index)
-				return nil
-			},
-			3,
-		)
-		if err != nil {
-			fmt.Println("error", err)
-			break
-		}
-		err = taskQueue.Add(
-			func() error {
-				fmt.Printf("error %d\n", index)
-				return fmt.Errorf("hoge %d", index)
-			},
-			2,
-		)
-		if err != nil {
-			fmt.Println("error", err)
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-		i++
-
-		if i > 100 {
-			taskQueue.Stop()
-			fmt.Println("task Stopped")
-			break
-		}
+	err = taskQueue.Add(
+		func() error {
+			fmt.Printf("hoge %d\n", 1)
+			return nil
+		},
+		1,
+	)
+	if err != nil {
+		panic(err)
 	}
+	err = taskQueue.Add(
+		func() error {
+			return fmt.Errorf("error %d", 1)
+		},
+		3,
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = taskQueue.Add(
+		func() error {
+			fmt.Printf("hoge %d\n", 2)
+			return nil
+		},
+		1,
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = taskQueue.Add(
+		func() error {
+			return fmt.Errorf("error %d", 2)
+		},
+		3,
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = taskQueue.Add(
+		func() error {
+			fmt.Printf("hoge %d\n", 3)
+			return nil
+		},
+		1,
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = taskQueue.Add(
+		func() error {
+			return fmt.Errorf("error %d", 3)
+		},
+		3,
+	)
+	if err != nil {
+		panic(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+
 }

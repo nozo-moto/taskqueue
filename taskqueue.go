@@ -6,25 +6,34 @@ import (
 	"time"
 )
 
-type task struct {
-	f          func() error
-	retryTimes int
+// Task is Task
+type Task struct {
+	F          func() error
+	RetryTimes int
+}
+
+// Err is tasks fail error
+type Err struct {
+	Task Task
+	Err  error
 }
 
 // TaskQueue is taskqueue struct
 type TaskQueue struct {
 	interval time.Duration
 	sync.RWMutex
-	tasks     []task
+	tasks     []Task
 	breakFlag bool
-	ch        chan int
+	closeCh   chan int
+	Error     chan Err
 }
 
 // New Create new struct
 func New(interval time.Duration) *TaskQueue {
 	return &TaskQueue{
 		interval: interval,
-		ch:       make(chan int),
+		closeCh:  make(chan int),
+		Error:    make(chan Err),
 	}
 }
 
@@ -34,19 +43,19 @@ func (t *TaskQueue) Add(f func() error, retryTimes int) error {
 		return errors.New("taskQueue.Stop is called")
 	}
 	t.Lock()
-	t.tasks = append(t.tasks, task{
-		f:          f,
-		retryTimes: retryTimes,
+	t.tasks = append(t.tasks, Task{
+		F:          f,
+		RetryTimes: retryTimes,
 	})
 	t.Unlock()
 	return nil
 }
 
-func (t *TaskQueue) addNotCheckBreakFlag(f func() error, retryTimes int, args ...interface{}) {
+func (t *TaskQueue) addNotCheckBreakFlag(f func() error, retryTimes int) {
 	t.Lock()
-	t.tasks = append(t.tasks, task{
-		f:          f,
-		retryTimes: retryTimes,
+	t.tasks = append(t.tasks, Task{
+		F:          f,
+		RetryTimes: retryTimes,
 	})
 	t.Unlock()
 }
@@ -57,25 +66,31 @@ L:
 	for {
 		if len(t.tasks) > 0 {
 			tt := t.pop()
-			if err := tt.f(); err != nil {
-				t.retry(tt)
+			if err := tt.F(); err != nil {
+				t.retry(tt, err)
 			}
 		}
 		if len(t.tasks) <= 0 && t.breakFlag {
-			t.ch <- 1
+			t.closeCh <- 1
 			break L
 		}
 		time.Sleep(t.interval)
 	}
 }
 
-func (t *TaskQueue) retry(tt task) {
-	if tt.retryTimes > 1 {
-		t.addNotCheckBreakFlag(tt.f, tt.retryTimes-1)
+func (t *TaskQueue) retry(tt Task, err error) {
+	tt.RetryTimes = tt.RetryTimes - 1
+	if tt.RetryTimes >= 1 {
+		t.addNotCheckBreakFlag(tt.F, tt.RetryTimes)
+	}
+
+	t.Error <- Err{
+		Task: tt,
+		Err:  err,
 	}
 }
 
-func (t *TaskQueue) pop() task {
+func (t *TaskQueue) pop() Task {
 	t.Lock()
 	task := t.tasks[0]
 	t.tasks = t.tasks[1:]
@@ -85,5 +100,6 @@ func (t *TaskQueue) pop() task {
 
 // Stop stop taskqueue
 func (t *TaskQueue) Stop() {
-	<-t.ch
+	t.breakFlag = true
+	<-t.closeCh
 }
