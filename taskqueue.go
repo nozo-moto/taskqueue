@@ -102,4 +102,6 @@ func (t *TaskQueue) pop() Task {
 func (t *TaskQueue) Stop() {
 	t.breakFlag = true
 	<-t.closeCh
+	close(t.closeCh)
+	close(t.Error)
 }

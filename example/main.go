@@ -11,14 +11,26 @@ func main() {
 	var err error
 	taskQueue := taskqueue.New(100 * time.Millisecond)
 	go taskQueue.Run()
-	defer taskQueue.Stop()
+	defer func() {
+		taskQueue.Stop()
+
+		for {
+		}
+	}()
 
 	fmt.Println("task run ")
 
 	go func() {
+	L:
 		for {
-			err := <-taskQueue.Error
-			fmt.Println("error cause  ", err.Err, err.Task.RetryTimes)
+			select {
+			case err, ok := <-taskQueue.Error:
+				if !ok {
+					fmt.Println("Finished Taskqueue")
+					break L
+				}
+				fmt.Println("error cause  ", err.Err, err.Task.RetryTimes, ok)
+			}
 		}
 	}()
 
@@ -79,6 +91,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	time.Sleep(100 * time.Millisecond)
 
 }
