@@ -1,6 +1,6 @@
 # Task_Queue
 
-[![CircleCI](https://circleci.com/gh/nozo-moto/taskqueue.svg?style=svg)](https://circleci.com/gh/nozo-moto/taskqueue)
+[![build](https://github.com/nozo-moto/taskqueue/actions/workflows/go.yml/badge.svg)](https://github.com/nozo-moto/taskqueue/actions/workflows/go.yml)
 
 This is task queue worker. I create referencing TaskQueue of GCP.
 You can set task's interval time, and retry count.
@@ -23,7 +23,7 @@ go taskQueue.Run()
 err := taskQueue.Add(
 	func(args ...interface{}) error {
         // Get Agument
-		index, ok := args[0].([]interface{})[0].(int) 
+		index, ok := args[0].([]interface{})[0].(int)
 		if !ok {
 			panic("error assation not good")
 		}
@@ -32,7 +32,7 @@ err := taskQueue.Add(
 		return nil
 	},
 	3, // Retry Count
-	index, // Argument 
+	index, // Argument
 )
 
 ```
