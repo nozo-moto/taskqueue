@@ -1,15 +1,24 @@
 package taskqueue
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
 
+var (
+	ErrStopped = fmt.Errorf("taskQueue.Stop is called")
+)
+
+const (
+	defaultTimeout = 3
+)
+
 // Task is Task
 type Task struct {
-	F          func() error
-	RetryTimes int
+	f         func(...any) error
+	args      []any
+	retrytime int
 }
 
 // Err is tasks fail error
@@ -37,27 +46,48 @@ func New(interval time.Duration) *TaskQueue {
 	}
 }
 
-// Add is add job to task queue
-func (t *TaskQueue) Add(f func() error, retryTimes int) error {
-	if t.breakFlag {
-		return errors.New("taskQueue.Stop is called")
+type Options struct {
+	retryTime int
+}
+
+type Option func(*Options)
+
+func RetryTime(retryTime int) Option {
+	return func(args *Options) {
+		args.retryTime = retryTime
 	}
+}
+
+// Add is add job to task queue
+func (t *TaskQueue) Add(f func(...any) error, args ...any) error {
+	// opts := &Options {
+	//     retryTime: defaultTimeout,
+	// }
+
+	// for _, optionFunc := range optionFuncs {
+	//     optionFunc(opts)
+	// }
+
+	if t.breakFlag {
+		return ErrStopped
+	}
+
 	t.Lock()
+	defer t.Unlock()
 	t.tasks = append(t.tasks, Task{
-		F:          f,
-		RetryTimes: retryTimes,
+		f:         f,
+		args:      args,
+		retrytime: defaultTimeout,
+		// retrytime: opts.retryTime,
 	})
-	t.Unlock()
+
 	return nil
 }
 
-func (t *TaskQueue) addNotCheckBreakFlag(f func() error, retryTimes int) {
+func (t *TaskQueue) addNotCheckBreakFlag(task Task) {
 	t.Lock()
-	t.tasks = append(t.tasks, Task{
-		F:          f,
-		RetryTimes: retryTimes,
-	})
-	t.Unlock()
+	defer t.Unlock()
+	t.tasks = append(t.tasks, task)
 }
 
 // Run run taskqueue
@@ -66,7 +96,7 @@ L:
 	for {
 		if len(t.tasks) > 0 {
 			tt := t.pop()
-			if err := tt.F(); err != nil {
+			if err := tt.f(tt.args); err != nil {
 				t.retry(tt, err)
 			}
 		}
@@ -79,9 +109,9 @@ L:
 }
 
 func (t *TaskQueue) retry(tt Task, err error) {
-	tt.RetryTimes = tt.RetryTimes - 1
-	if tt.RetryTimes >= 1 {
-		t.addNotCheckBreakFlag(tt.F, tt.RetryTimes)
+	tt.retrytime = tt.retrytime - 1
+	if tt.retrytime >= 1 {
+		t.addNotCheckBreakFlag(tt)
 	}
 
 	t.Error <- Err{
@@ -92,9 +122,9 @@ func (t *TaskQueue) retry(tt Task, err error) {
 
 func (t *TaskQueue) pop() Task {
 	t.Lock()
+	defer t.Unlock()
 	task := t.tasks[0]
 	t.tasks = t.tasks[1:]
-	t.Unlock()
 	return task
 }
 
@@ -104,4 +134,10 @@ func (t *TaskQueue) Stop() {
 	<-t.closeCh
 	close(t.closeCh)
 	close(t.Error)
+}
+
+func (t *TaskQueue) Count() int {
+	t.Lock()
+	defer t.Unlock()
+	return len(t.tasks)
 }
